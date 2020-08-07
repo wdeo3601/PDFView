@@ -96,7 +96,7 @@ class PDFView @JvmOverloads constructor(
     //缩放相关
     private var mCanvasScale: Float = 1f //画布的缩放倍数
     private var mCanvasTranslate: PointF = PointF() //画布的XY方向的平移
-    private var mCanvasScaleCenterPoint: PointF? = null //多点触控按下时，画布上的缩放中心点
+    private var mMultiFingerCenterPointStart: PointF = PointF() //多点触控按下时，画布上的缩放中心点
     private var mScaleStart: Float = mCanvasScale //多点触控按下时，记录按下时的缩放倍数
     private var mMultiFingerDistanceStart: Float = 0f //多点触控按下时，记录按下时两个手指之间的间距
     private var mTranslateStart: PointF = PointF() //多点触控按下时，记录此时的scrollXY
@@ -358,42 +358,55 @@ class PDFView @JvmOverloads constructor(
                 //记录按下时的缩放倍数
                 mScaleStart = mCanvasScale
                 //记录按下时的画布中心点
-                if (mCanvasScaleCenterPoint == null)
-                    mCanvasScaleCenterPoint = PointF()
-                mCanvasScaleCenterPoint?.set(
+                mMultiFingerCenterPointStart.set(
                     (event.getX(0) + event.getX(1)) / 2,
                     (event.getY(0) + event.getY(1)) / 2
                 )
-                mTranslateStart.set(translationX, translationY)
+                mTranslateStart.set(mCanvasTranslate)
                 return mCanZoom
             }
             MotionEvent.ACTION_MOVE -> {
                 debug("onZoomTouchEvent-ACTION_MOVE")
                 if (event.pointerCount < 2) return false
-//                val multiFingerDistanceEnd =
-//                    distance(
-//                        event.getX(0),
-//                        event.getX(1),
-//                        event.getY(0),
-//                        event.getY(1)
-//                    )
-//                val tempScale = (multiFingerDistanceEnd / mMultiFingerDistanceStart) * mScaleStart
-//                mCanvasScale = when (tempScale) {
-//                    in 0f..mMinScale -> mMinScale
-//                    in mMinScale..mMaxScale -> tempScale
-//                    else -> mMaxScale
-//                }
-//
-//                val centerPointEndX = (event.getX(0) + event.getX(1)) / 2
-//                val centerPointEndY = (event.getY(0) + event.getY(1)) / 2
-//
-//                val vLeftStart: Float = mCanvasScaleCenterPoint!!.x - mTranslateStart.x
-//                val vTopStart: Float = mCanvasScaleCenterPoint!!.y - mTranslateStart.y
-//                val vLeftNow: Float = vLeftStart * (mCanvasScale / mScaleStart)
-//                val vTopNow: Float = vTopStart * (mCanvasScale / mScaleStart)
-//                mCanvasTranslate.x = centerPointEndX - vLeftNow
-//                mCanvasTranslate.y = centerPointEndY - vTopNow
-//                invalidate()
+                val multiFingerDistanceEnd =
+                    distance(
+                        event.getX(0),
+                        event.getX(1),
+                        event.getY(0),
+                        event.getY(1)
+                    )
+                val tempScale = (multiFingerDistanceEnd / mMultiFingerDistanceStart) * mScaleStart
+                mCanvasScale = when (tempScale) {
+                    in 0f..mMinScale -> mMinScale
+                    in mMinScale..mMaxScale -> tempScale
+                    else -> mMaxScale
+                }
+
+                val centerPointEndX = (event.getX(0) + event.getX(1)) / 2
+                val centerPointEndY = (event.getY(0) + event.getY(1)) / 2
+
+                val vLeftStart: Float = mMultiFingerCenterPointStart.x - mTranslateStart.x
+                val vTopStart: Float = mMultiFingerCenterPointStart.y - mTranslateStart.y
+                val vLeftNow: Float = vLeftStart * (mCanvasScale / mScaleStart)
+                val vTopNow: Float = vTopStart * (mCanvasScale / mScaleStart)
+
+                //判断滑动边界，重新设置滑动值
+                val canTranslateXRange = getCanTranslateXRange()
+                val canTranslateYRange = getCanTranslateYRange()
+                val tempTranslateX = centerPointEndX - vLeftNow
+                val tempTranslateY = centerPointEndY - vTopNow
+                val nextTranslateX = when {
+                    tempTranslateX in canTranslateXRange -> tempTranslateX
+                    tempTranslateX > canTranslateXRange.upper -> canTranslateXRange.upper
+                    else -> canTranslateXRange.lower
+                }
+                val nextTranslateY = when {
+                    tempTranslateY in canTranslateYRange -> tempTranslateY
+                    tempTranslateY > canTranslateYRange.upper -> canTranslateYRange.upper
+                    else -> canTranslateYRange.lower
+                }
+                mCanvasTranslate.set(nextTranslateX,nextTranslateY)
+                invalidate()
                 return true
             }
             MotionEvent.ACTION_UP -> {
@@ -588,7 +601,7 @@ class PDFView @JvmOverloads constructor(
         ): Boolean {
             val pdfView = mWeakReference.get() ?: return false
 
-            //1.判断滑动边界，重新设置滑动值
+            //判断滑动边界，重新设置滑动值
             val canTranslateXRange = pdfView.getCanTranslateXRange()
             val canTranslateYRange = pdfView.getCanTranslateYRange()
             val tempTranslateX = pdfView.mCanvasTranslate.x - distanceX
