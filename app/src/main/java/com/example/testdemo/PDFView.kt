@@ -9,6 +9,7 @@ import android.graphics.pdf.PdfRenderer
 import android.os.*
 import android.util.AttributeSet
 import android.util.Log
+import android.util.Range
 import android.view.GestureDetector
 import android.view.MotionEvent
 import android.view.View
@@ -417,11 +418,11 @@ class PDFView @JvmOverloads constructor(
      * 滑动或飞速滑动时，计算当前正在的pdf页索引
      */
     private fun calculateCurrentPageIndex() {
-        val scrollY = scrollY
+        val translateY = mCanvasTranslate.y
         for (index in mPagePlaceHolders.indices) {
             val pageRect = mPagePlaceHolders[index].fillWidthRect
-            if (scrollY > pageRect.top * mCanvasScale
-                && scrollY <= pageRect.bottom * mCanvasScale
+            if (abs(translateY) > pageRect.top * mCanvasScale
+                && abs(translateY) <= pageRect.bottom * mCanvasScale
             ) {
                 mCurrentPageIndex = index
                 debug("calculateCurrentPageIndex-mCurrentPageIndex:$mCurrentPageIndex")
@@ -445,7 +446,7 @@ class PDFView @JvmOverloads constructor(
         debug("startFlingAnim--distanceX-$distanceX--distanceY-$distanceY--animDuration-$animDuration")
         mFlingAnim = ValueAnimator().apply {
             setFloatValues(0f, 1f)
-            duration = max(animDuration, 100) //时间最短不能小于100毫秒
+            duration = animDuration
             interpolator = DecelerateInterpolator()
             addUpdateListener(PDFFlingAnimUpdateListener(this@PDFView, distanceX, distanceY))
             addListener(PdfFlingAnimListenerAdapter(this@PDFView))
@@ -472,17 +473,17 @@ class PDFView @JvmOverloads constructor(
     }
 
     /**
-     * 获取x轴可滚动的间距
+     * 获取x轴可平移的间距
      */
-    private fun getCanScrollXDistance(): Float {
-        return mCanvasScale * mPdfTotalWidth - width
+    private fun getCanTranslateXRange(): Range<Float> {
+        return Range(-(mCanvasScale * mPdfTotalWidth - width), 0f)
     }
 
     /**
-     * 获取y轴可滚动的间距
+     * 获取y轴可平移的间距
      */
-    private fun getCanScrollYDistance(): Float {
-        return mCanvasScale * mPdfTotalHeight - height
+    private fun getCanTranslateYRange(): Range<Float> {
+        return Range(-(mCanvasScale * mPdfTotalHeight - height), 0f)
     }
 
     /**
@@ -588,30 +589,27 @@ class PDFView @JvmOverloads constructor(
             val pdfView = mWeakReference.get() ?: return false
 
             //1.判断滑动边界，重新设置滑动值
-            val canScrollXDistance = pdfView.getCanScrollXDistance()
-            val canScrollYDistance = pdfView.getCanScrollYDistance()
-            val nextScrollX = pdfView.scrollX + distanceX
-            val nextScrollY = pdfView.scrollY + distanceY
-            val realDistanceX = if (nextScrollX in 0f..canScrollXDistance)
-                distanceX.toInt()
-            else
-                0
-            val realDistanceY = if (nextScrollY in 0f..canScrollYDistance)
-                distanceY.toInt()
-            else
-                0
-            //2.滑动过程中计算缩放中心点
-            if (pdfView.mCanvasScaleCenterPoint != null)
-                pdfView.mCanvasScaleCenterPoint!!.offset(
-                    realDistanceX.toFloat(),
-                    realDistanceY.toFloat()
-                )
+            val canTranslateXRange = pdfView.getCanTranslateXRange()
+            val canTranslateYRange = pdfView.getCanTranslateYRange()
+            val tempTranslateX = pdfView.mCanvasTranslate.x - distanceX
+            val tempTranslateY = pdfView.mCanvasTranslate.y - distanceY
+            val nextTranslateX = when {
+                tempTranslateX in canTranslateXRange -> tempTranslateX
+                tempTranslateX > canTranslateXRange.upper -> canTranslateXRange.upper
+                else -> canTranslateXRange.lower
+            }
+            val nextTranslateY = when {
+                tempTranslateY in canTranslateYRange -> tempTranslateY
+                tempTranslateY > canTranslateYRange.upper -> canTranslateYRange.upper
+                else -> canTranslateYRange.lower
+            }
 
             //3.开始滑动，重绘
-            pdfView.scrollBy(realDistanceX, realDistanceY)
+            pdfView.mCanvasTranslate.set(nextTranslateX, nextTranslateY)
+            pdfView.invalidate()
             //4.重新计算当前页索引
             pdfView.calculateCurrentPageIndex()
-            pdfView.debug("onScroll-distanceX:${distanceX}-scrollY:${pdfView.scrollY}")
+            pdfView.debug("onScroll-distanceX:${distanceX}-distanceY:${distanceY}")
             //5. 滑动结束监听回调，创建page位图数据（需要再 onTouchEvent 中判断滑动结束,所以这里返回 false）
             return false
         }
@@ -629,25 +627,23 @@ class PDFView @JvmOverloads constructor(
                 && (abs(e1.x - e2.x) > 100 || abs(e1.y - e2.y) > 100)
                 && (abs(velocityX) > 500 || abs(velocityY) > 500)
             ) {
-                val canScrollXDistance = pdfView.getCanScrollXDistance()
-                val canScrollYDistance = pdfView.getCanScrollYDistance()
-                val tempScrollX = pdfView.scrollX
-                val tempScrollY = pdfView.scrollY
-                val nextScrollX = tempScrollX - velocityX * 0.75f
-                val nextScrollY = tempScrollY - velocityY * 0.75f
-                val endScrollX = when {
-                    nextScrollX in 0f..canScrollXDistance -> nextScrollX
-                    nextScrollX < 0f -> 0f
-                    else -> canScrollXDistance
+                val canTranslateXRange = pdfView.getCanTranslateXRange()
+                val canTranslateYRange = pdfView.getCanTranslateYRange()
+                val tempTranslateX = pdfView.mCanvasTranslate.x + velocityX * 0.75f
+                val tempTranslateY = pdfView.mCanvasTranslate.y + velocityY * 0.75f
+                val endTranslateX = when {
+                    tempTranslateX in canTranslateXRange -> tempTranslateX
+                    tempTranslateX > canTranslateXRange.upper -> canTranslateXRange.upper
+                    else -> canTranslateXRange.lower
                 }
-                val endScrollY = when {
-                    nextScrollY in 0f..canScrollYDistance -> nextScrollY
-                    nextScrollY < 0f -> 0f
-                    else -> canScrollYDistance
+                val endTranslateY = when {
+                    tempTranslateY in canTranslateYRange -> tempTranslateY
+                    tempTranslateY > canTranslateYRange.upper -> canTranslateYRange.upper
+                    else -> canTranslateYRange.lower
                 }
 
-                val distanceX = endScrollX - tempScrollX
-                val distanceY = endScrollY - tempScrollY
+                val distanceX = endTranslateX - pdfView.mCanvasTranslate.x
+                val distanceY = endTranslateY - pdfView.mCanvasTranslate.y
 
                 pdfView.startFlingAnim(distanceX, distanceY)
                 return true
@@ -666,21 +662,17 @@ class PDFView @JvmOverloads constructor(
         private val distanceY: Float
     ) : ValueAnimator.AnimatorUpdateListener {
         private val mWeakReference = WeakReference(pdfView)
-        private val mLastScrollX = pdfView.scrollX
-        private val mLastScrollY = pdfView.scrollY
+        private val lastCanvasTranslate = PointF(
+            pdfView.mCanvasTranslate.x,
+            pdfView.mCanvasTranslate.y
+        )
 
         override fun onAnimationUpdate(animation: ValueAnimator) {
             val pdfView = mWeakReference.get() ?: return
             val percent = animation.animatedValue as Float
-            val scrollX = mLastScrollX + (distanceX * percent).toInt()
-            val scrollY = mLastScrollY + (distanceY * percent).toInt()
-            //滑动过程中计算缩放中心点
-            if (pdfView.mCanvasScaleCenterPoint != null)
-                pdfView.mCanvasScaleCenterPoint!!.offset(
-                    scrollX - pdfView.scrollX.toFloat(),
-                    scrollY - pdfView.scrollY.toFloat()
-                )
-            pdfView.scrollTo(scrollX, scrollY)
+            pdfView.mCanvasTranslate.x = lastCanvasTranslate.x + distanceX * percent
+            pdfView.mCanvasTranslate.y = lastCanvasTranslate.y + distanceY * percent
+            pdfView.invalidate()
             //重新计算当前页索引
             pdfView.calculateCurrentPageIndex()
         }
