@@ -199,8 +199,26 @@ class PDFView @JvmOverloads constructor(
             mOffscreenPageLimit = limit
     }
 
+    /**
+     * 设置当前页索引改变回调
+     */
     fun setOnPageChangedListener(listener: OnPageChangedListener) {
         this.mOnPageChangedListener = listener
+    }
+
+    /**
+     * 是否支持缩放
+     * 默认支持
+     */
+    fun isCanZoom(canZoom: Boolean) {
+        this.mCanZoom = canZoom
+    }
+
+    /**
+     * 设置最大缩放倍数
+     */
+    fun setMaxScale(maxScale: Float) {
+        this.mMaxScale = min(maxScale, 20f)
     }
 
     //endregion
@@ -384,6 +402,9 @@ class PDFView @JvmOverloads constructor(
      * 多指触摸，处理缩放
      */
     private fun onZoomTouchEvent(event: MotionEvent): Boolean {
+        //如果没开启缩放，就不处理多点触控
+        if (!mCanZoom) return false
+
         when (event.actionMasked) {
             MotionEvent.ACTION_POINTER_DOWN -> {
                 debug("onZoomTouchEvent-ACTION_POINTER_DOWN")
@@ -634,7 +655,10 @@ class PDFView @JvmOverloads constructor(
                         pdfView.invalidate()
                         pdfView.submitCreateLoadingPagesTask()
                         //初始化时触发页面变动回调
-                        pdfView.mOnPageChangedListener?.onPageChanged(pdfView.mCurrentPageIndex, tempPagePlaceHolders.size)
+                        pdfView.mOnPageChangedListener?.onPageChanged(
+                            pdfView.mCurrentPageIndex,
+                            tempPagePlaceHolders.size
+                        )
                     }
                 }
                 MESSAGE_CREATE_LOADING_PDF_BITMAP -> {
