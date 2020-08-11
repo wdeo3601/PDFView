@@ -121,9 +121,12 @@ class PDFView @JvmOverloads constructor(
     private var mInitPageFramesFuture: Future<*>? = null
 
     //page转换bitmap的缓存
-    private val mOffscreenPageLimit = 2 //当前可见页的上下两边各缓存多少页，类似viewpager的属性
+    private var mOffscreenPageLimit = 2 //当前可见页的上下两边各缓存多少页，类似viewpager的属性
     private val mLoadingPagesBitmapMemoryCache: LruCache<String, Bitmap>//内存缓存
     private val mLoadingPagesBitmapDiskCache: DiskLruCache//磁盘缓存
+
+    //滑动时的页面变动监听
+    private var mOnPageChangedListener: OnPageChangedListener? = null
 
     init {
         //主线程初始化Handler
@@ -146,6 +149,7 @@ class PDFView @JvmOverloads constructor(
         mDividerPaint.isAntiAlias = true
     }
 
+    //region 对外暴露的方法
     /**
      * 打开网络pdf文件
      */
@@ -184,6 +188,22 @@ class PDFView @JvmOverloads constructor(
             e.printStackTrace()
         }
     }
+
+    /**
+     * 设置当前页上下两边的缓存页个数
+     * 默认上下各2个
+     */
+    fun setOffscreenPageLimit(limit: Int) {
+        if (limit < 1) throw IllegalArgumentException("limit must >= 1")
+        if (limit != mOffscreenPageLimit)
+            mOffscreenPageLimit = limit
+    }
+
+    fun setOnPageChangedListener(listener: OnPageChangedListener) {
+        this.mOnPageChangedListener = listener
+    }
+
+    //endregion
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         val widthSpecMode = MeasureSpec.getMode(widthMeasureSpec)
@@ -460,14 +480,19 @@ class PDFView @JvmOverloads constructor(
         val translateY = mCanvasTranslate.y
         for (index in mPagePlaceHolders.indices) {
             val pageRect = mPagePlaceHolders[index].fillWidthRect
-            if (abs(translateY) > pageRect.top * mCanvasScale
-                && abs(translateY) <= pageRect.bottom * mCanvasScale
+            val offset = measuredHeight * 0.4 //pdf页占屏幕超过60%时，即为当前页
+            if (abs(translateY) + offset > pageRect.top * mCanvasScale
+                && abs(translateY) + offset <= (pageRect.bottom + mDividerHeight) * mCanvasScale
             ) {
+                if (index != mCurrentPageIndex) {
+                    mOnPageChangedListener?.onPageChanged(index, mPagePlaceHolders.size)
+                }
                 mCurrentPageIndex = index
                 debug("calculateCurrentPageIndex-mCurrentPageIndex:$mCurrentPageIndex")
                 return
             }
         }
+        debug("calculateCurrentPageIndex-LoopFinish:$mCurrentPageIndex")
     }
 
     /**
@@ -608,6 +633,8 @@ class PDFView @JvmOverloads constructor(
                         pdfView.mPagePlaceHolders.addAll(tempPagePlaceHolders)
                         pdfView.invalidate()
                         pdfView.submitCreateLoadingPagesTask()
+                        //初始化时触发页面变动回调
+                        pdfView.mOnPageChangedListener?.onPageChanged(pdfView.mCurrentPageIndex, tempPagePlaceHolders.size)
                     }
                 }
                 MESSAGE_CREATE_LOADING_PDF_BITMAP -> {
@@ -830,9 +857,18 @@ class PDFView @JvmOverloads constructor(
 
             val tempScalingPages = arrayListOf<DrawingPage>()
 
-            //把缩放后显示在屏幕上的各page部分合并成一个bitmap
-
-            val startIndex = currentPageIndex
+            var startIndex = currentPageIndex
+            run {
+                for (index in currentPageIndex downTo 0) {
+                    if (pagePlaceHolders[index].fillWidthRect.bottom * pdfView.mCanvasScale < abs(
+                            currentTranslateY
+                        )
+                    ) {
+                        return@run
+                    }
+                    startIndex = index
+                }
+            }
             var endIndex = startIndex
             run {
                 for (index in startIndex..pagePlaceHolders.lastIndex) {
@@ -858,6 +894,10 @@ class PDFView @JvmOverloads constructor(
                         fillWidthRect.bottom * pdfView.mCanvasScale - abs(currentTranslateY),
                         pdfView.measuredHeight - pdfView.paddingTop - pdfView.paddingBottom.toFloat()
                     )
+
+                //处理滑动到分隔线停止的情况
+                if (scalingRectBottom <= scalingRectTop) continue
+
                 val scalingRect = RectF(
                     0f,
                     scalingRectTop,
@@ -1048,6 +1088,10 @@ class PDFView @JvmOverloads constructor(
             }
         }
 
+    }
+
+    interface OnPageChangedListener {
+        fun onPageChanged(currentPageIndex: Int, totalPageCount: Int)
     }
 
     //region 缓存存取相关
