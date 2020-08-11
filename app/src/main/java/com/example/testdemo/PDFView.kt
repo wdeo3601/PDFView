@@ -209,8 +209,9 @@ class PDFView @JvmOverloads constructor(
         //数据还没准备好，直接返回
         if (mPagePlaceHolders.isEmpty()) return
 
-        //平移缩放
         canvas.save()
+
+        //平移缩放
         canvas.translate(mCanvasTranslate.x, mCanvasTranslate.y)
         canvas.scale(mCanvasScale, mCanvasScale)
 
@@ -251,8 +252,12 @@ class PDFView @JvmOverloads constructor(
      * 画完整显示的pdf页面
      */
     private fun drawLoadingPages(canvas: Canvas) {
-        mLoadingPages.filter {
-            it.pageRect?.fillWidthRect != null && it.bitmap != null
+        mLoadingPages.filter { page ->
+            //即将缩放显示的页面，不绘制它的全页bitmap
+            val isScaling = page.pageIndex in mScalingPages.map { it.pageIndex }
+            page.pageRect?.fillWidthRect != null
+                    && page.bitmap != null
+                    && !isScaling
         }
             .forEach {
                 val fillWidthScale = it.pageRect!!.fillWidthScale
@@ -423,10 +428,13 @@ class PDFView @JvmOverloads constructor(
                 }
                 mCanvasTranslate.set(nextTranslateX, nextTranslateY)
                 invalidate()
+                //重新计算当前页索引
+                calculateCurrentPageIndex()
                 return true
             }
             MotionEvent.ACTION_UP -> {
                 debug("onZoomTouchEvent-ACTION_UP")
+                submitCreateLoadingPagesTask()
                 //只有缩放了，才去创建缩放的page的bitmap
                 submitCreateScalingPagesTask()
                 return true
@@ -793,7 +801,7 @@ class PDFView @JvmOverloads constructor(
                     //新创建的bitmap，存到内存缓存和本地缓存
                     pdfView.putLoadingPagesBitmapToCache(index, bitmap)
                 }
-                tempLoadingPages.add(DrawingPage(pageRect, bitmap))
+                tempLoadingPages.add(DrawingPage(pageRect, bitmap, index))
             }
 
             val message = Message()
@@ -875,7 +883,13 @@ class PDFView @JvmOverloads constructor(
                 page.render(bitmap, null, matrix, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
                 page.close()
 
-                tempScalingPages.add(DrawingPage(PageRect(fillWidthRect = scalingRect), bitmap))
+                tempScalingPages.add(
+                    DrawingPage(
+                        PageRect(fillWidthRect = scalingRect),
+                        bitmap,
+                        index
+                    )
+                )
             }
 
             val message = Message()
@@ -973,16 +987,19 @@ class PDFView @JvmOverloads constructor(
      */
     private data class DrawingPage(
         val pageRect: PageRect?,
-        val bitmap: Bitmap?
+        val bitmap: Bitmap?,
+        val pageIndex: Int
     ) : Parcelable {
         constructor(parcel: Parcel) : this(
             parcel.readParcelable(PageRect::class.java.classLoader),
-            parcel.readParcelable(Bitmap::class.java.classLoader)
+            parcel.readParcelable(Bitmap::class.java.classLoader),
+            parcel.readInt()
         )
 
         override fun writeToParcel(parcel: Parcel, flags: Int) {
             parcel.writeParcelable(pageRect, flags)
             parcel.writeParcelable(bitmap, flags)
+            parcel.writeInt(pageIndex)
         }
 
         override fun describeContents(): Int {
@@ -1095,7 +1112,7 @@ class PDFView @JvmOverloads constructor(
         try {
             val edit = mLoadingPagesBitmapDiskCache.edit(key)
             val outputStream = edit.newOutputStream(0)
-            bitmap.compress(Bitmap.CompressFormat.PNG, 100, outputStream)
+            bitmap.compress(Bitmap.CompressFormat.WEBP, 100, outputStream)
             edit.commit()
         } catch (e: Exception) {
             e.printStackTrace()
