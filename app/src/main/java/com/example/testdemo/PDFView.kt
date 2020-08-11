@@ -103,7 +103,7 @@ class PDFView @JvmOverloads constructor(
 
     //缩放配置参数
     private var mCanZoom = true //是否可以缩放
-    private var mMaxScale = 5f //最大缩放倍数
+    private var mMaxScale = 10f //最大缩放倍数
     private var mMinScale = 1f //最小缩放倍数
 
     //滑动相关
@@ -255,8 +255,13 @@ class PDFView @JvmOverloads constructor(
             it.pageRect?.fillWidthRect != null && it.bitmap != null
         }
             .forEach {
-                val fillWidthRect = it.pageRect!!.fillWidthRect
-                canvas.drawBitmap(it.bitmap!!, fillWidthRect.left, fillWidthRect.top, mPDFPaint)
+                val fillWidthScale = it.pageRect!!.fillWidthScale
+                val fillWidthRect = it.pageRect.fillWidthRect
+                canvas.save()
+                canvas.translate(fillWidthRect.left, fillWidthRect.top)
+                canvas.scale(fillWidthScale, fillWidthScale)
+                canvas.drawBitmap(it.bitmap!!, 0f, 0f, mPDFPaint)
+                canvas.restore()
             }
     }
 
@@ -337,6 +342,7 @@ class PDFView @JvmOverloads constructor(
                         if (!isFling) {
                             //单指滑动结束，处理滑动结束（无飞速滑动的情况）
                             submitCreateLoadingPagesTask()
+                            submitCreateScalingPagesTask()
                         }
                         true
                     }
@@ -422,7 +428,6 @@ class PDFView @JvmOverloads constructor(
             MotionEvent.ACTION_UP -> {
                 debug("onZoomTouchEvent-ACTION_UP")
                 //只有缩放了，才去创建缩放的page的bitmap
-//                if (mCanvasScale != 1f)
                 submitCreateScalingPagesTask()
                 return true
             }
@@ -496,6 +501,8 @@ class PDFView @JvmOverloads constructor(
      * 如果线程池里有未执行或正在执行的任务，取消那个任务
      */
     private fun submitCreateScalingPagesTask() {
+        if (mCanvasScale == 1f) return
+
         if (mCreateScalingPagesFuture?.isDone != true)
             mCreateScalingPagesFuture?.cancel(true)
         mCreateScalingPagesFuture =
@@ -749,6 +756,7 @@ class PDFView @JvmOverloads constructor(
         private fun preLoadPdf() {
             val pdfView = mWeakReference.get() ?: return
             pdfView.submitCreateLoadingPagesTask()
+            pdfView.submitCreateScalingPagesTask()
         }
     }
 
@@ -776,15 +784,14 @@ class PDFView @JvmOverloads constructor(
                     //3.本地缓存没拿到，从pdf渲染器创建bitmap
                     val page = pdfRenderer.openPage(index)
                     bitmap = Bitmap.createBitmap(
-                        fillWidthRect.width().toInt(),
-                        fillWidthRect.height().toInt(),
+                        (fillWidthRect.width() / pageRect.fillWidthScale).toInt(),
+                        (fillWidthRect.height() / pageRect.fillWidthScale).toInt(),
                         Bitmap.Config.ARGB_8888
                     )
                     page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
                     page.close()
                     //新创建的bitmap，存到内存缓存和本地缓存
                     pdfView.putLoadingPagesBitmapToCache(index, bitmap)
-
                 }
                 tempLoadingPages.add(DrawingPage(pageRect, bitmap))
             }
@@ -799,7 +806,7 @@ class PDFView @JvmOverloads constructor(
 
     /**
      * 线程任务
-     * 创建正在缩放的显示的pdf页的全屏bitmap
+     * 创建正在缩放的显示的pdf页的bitmap
      */
     private class CreateScalingPageBitmapTask(pdfView: PDFView) : Runnable {
         private val mWeakReference = WeakReference(pdfView)
@@ -836,16 +843,25 @@ class PDFView @JvmOverloads constructor(
                 val fillWidthRect = placeHolderPageRect.fillWidthRect
 
                 //创建缩放bitmap的位置信息
-                val scalingRect = RectF(
-                    0f,
-                    max(fillWidthRect.top * pdfView.mCanvasScale - abs(currentTranslateY), 0f),
-                    pdfView.measuredWidth - pdfView.paddingLeft - pdfView.paddingRight.toFloat(),
+                val scalingRectTop =
+                    max(fillWidthRect.top * pdfView.mCanvasScale - abs(currentTranslateY), 0f)
+                val scalingRectBottom =
                     min(
                         fillWidthRect.bottom * pdfView.mCanvasScale - abs(currentTranslateY),
-                        abs(currentTranslateY) + pdfView.measuredHeight - pdfView.paddingTop - pdfView.paddingBottom
+                        pdfView.measuredHeight - pdfView.paddingTop - pdfView.paddingBottom.toFloat()
                     )
+                val scalingRect = RectF(
+                    0f,
+                    scalingRectTop,
+                    pdfView.measuredWidth - pdfView.paddingLeft - pdfView.paddingRight.toFloat(),
+                    scalingRectBottom
                 )
 
+                val bitmap = Bitmap.createBitmap(
+                    scalingRect.width().toInt(),
+                    scalingRect.height().toInt(),
+                    Bitmap.Config.ARGB_8888
+                )
                 val matrix = Matrix()
                 //page页真实的缩放倍数=原始页缩放到屏幕宽度的缩放倍数*画布的缩放倍数
                 val scale = placeHolderPageRect.fillWidthScale * pdfView.mCanvasScale
@@ -853,13 +869,7 @@ class PDFView @JvmOverloads constructor(
                 //平移，因为取的是已经缩放过的page页，所以平移量跟缩放后的画布平移量保持一致
                 matrix.postTranslate(
                     pdfView.mCanvasTranslate.x + (pdfView.paddingLeft + pdfView.mDividerHeight) * pdfView.mCanvasScale,
-                    min(fillWidthRect.top*pdfView.mCanvasScale + currentTranslateY, 0f)
-                )
-
-                val bitmap = Bitmap.createBitmap(
-                    scalingRect.width().toInt(),
-                    scalingRect.height().toInt(),
-                    Bitmap.Config.ARGB_8888
+                    min(fillWidthRect.top * pdfView.mCanvasScale + currentTranslateY, 0f)
                 )
                 val page = pdfRenderer.openPage(index)
                 page.render(bitmap, null, matrix, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
