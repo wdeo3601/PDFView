@@ -1,4 +1,4 @@
-package com.example.testdemo
+package com.wdeo3601.pdfview
 
 import android.animation.Animator
 import android.animation.AnimatorListenerAdapter
@@ -9,12 +9,12 @@ import android.graphics.pdf.PdfRenderer
 import android.os.*
 import android.util.AttributeSet
 import android.util.Log
+import android.util.LruCache
 import android.util.Range
 import android.view.GestureDetector
 import android.view.MotionEvent
 import android.view.View
 import android.view.animation.DecelerateInterpolator
-import androidx.collection.LruCache
 import com.jakewharton.disklrucache.DiskLruCache
 import java.io.ByteArrayOutputStream
 import java.io.File
@@ -81,7 +81,9 @@ class PDFView @JvmOverloads constructor(
     private var mPdfTotalHeight: Float = 0f
 
     //处理飞速滑动的手势识别器
-    private val mGestureDetector by lazy { GestureDetector(context, OnPDFGestureListener(this)) }
+    private val mGestureDetector by lazy { GestureDetector(context,
+        OnPDFGestureListener(this)
+    ) }
 
     //处理pdf转换bitmap的handler
     private val mPDFHandler: PDFHandler
@@ -163,7 +165,13 @@ class PDFView @JvmOverloads constructor(
                 showPdfFromPath(filePath)
             } else {
                 //取不到，开启任务下载pdf到本地
-                EXECUTOR_SERVICE.submit(PdfDownloadTask(this, fileUrl, filePath))
+                EXECUTOR_SERVICE.submit(
+                    PdfDownloadTask(
+                        this,
+                        fileUrl,
+                        filePath
+                    )
+                )
             }
             //下载完成后获取到本地路径，再调用显示本地pdf的方法
         } catch (e: Exception) {
@@ -238,7 +246,9 @@ class PDFView @JvmOverloads constructor(
 
         //初始化pdf页框架
         if (mInitPageFramesFuture == null)
-            mInitPageFramesFuture = EXECUTOR_SERVICE.submit(InitPdfFramesTask(this))
+            mInitPageFramesFuture = EXECUTOR_SERVICE.submit(
+                InitPdfFramesTask(this)
+            )
 //        initPageFrames(mPdfRenderer)
     }
 
@@ -356,7 +366,8 @@ class PDFView @JvmOverloads constructor(
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
                 debug("onTouchEvent-ACTION_DOWN")
-                mTouchState = TouchState.SINGLE_POINTER
+                mTouchState =
+                    TouchState.SINGLE_POINTER
                 //如果有正在执行的 fling 动画，就重置动画
                 stopFlingAnimIfNeeded()
                 mGestureDetector.onTouchEvent(event)
@@ -364,7 +375,8 @@ class PDFView @JvmOverloads constructor(
             }
             MotionEvent.ACTION_POINTER_DOWN -> {
                 debug("onTouchEvent-ACTION_POINTER_DOWN")
-                mTouchState = TouchState.MULTI_POINTER
+                mTouchState =
+                    TouchState.MULTI_POINTER
                 //如果有正在执行的 fling 动画，就重置动画
                 stopFlingAnimIfNeeded()
                 handled = onZoomTouchEvent(event)
@@ -533,8 +545,18 @@ class PDFView @JvmOverloads constructor(
             setFloatValues(0f, 1f)
             duration = animDuration
             interpolator = DecelerateInterpolator()
-            addUpdateListener(PDFFlingAnimUpdateListener(this@PDFView, distanceX, distanceY))
-            addListener(PdfFlingAnimListenerAdapter(this@PDFView))
+            addUpdateListener(
+                PDFFlingAnimUpdateListener(
+                    this@PDFView,
+                    distanceX,
+                    distanceY
+                )
+            )
+            addListener(
+                PdfFlingAnimListenerAdapter(
+                    this@PDFView
+                )
+            )
             start()
         }
     }
@@ -547,7 +569,9 @@ class PDFView @JvmOverloads constructor(
         if (mCreateLoadingPagesFuture?.isDone != true)
             mCreateLoadingPagesFuture?.cancel(true)
         mCreateLoadingPagesFuture =
-            EXECUTOR_SERVICE.submit(PdfPageToBitmapTask(this))
+            EXECUTOR_SERVICE.submit(
+                PdfPageToBitmapTask(this)
+            )
     }
 
     /**
@@ -560,7 +584,9 @@ class PDFView @JvmOverloads constructor(
         if (mCreateScalingPagesFuture?.isDone != true)
             mCreateScalingPagesFuture?.cancel(true)
         mCreateScalingPagesFuture =
-            EXECUTOR_SERVICE.submit(CreateScalingPageBitmapTask(this))
+            EXECUTOR_SERVICE.submit(
+                CreateScalingPageBitmapTask(this)
+            )
     }
 
     /**
@@ -852,11 +878,18 @@ class PDFView @JvmOverloads constructor(
                     //新创建的bitmap，存到内存缓存和本地缓存
                     pdfView.putLoadingPagesBitmapToCache(index, bitmap)
                 }
-                tempLoadingPages.add(DrawingPage(pageRect, bitmap, index))
+                tempLoadingPages.add(
+                    DrawingPage(
+                        pageRect,
+                        bitmap,
+                        index
+                    )
+                )
             }
 
             val message = Message()
-            message.what = PDFHandler.MESSAGE_CREATE_LOADING_PDF_BITMAP
+            message.what =
+                PDFHandler.MESSAGE_CREATE_LOADING_PDF_BITMAP
             message.data.putInt("index", currentPageIndex)
             message.data.putParcelableArrayList("list", tempLoadingPages)
             pdfView.mPDFHandler.sendMessage(message)
@@ -957,7 +990,8 @@ class PDFView @JvmOverloads constructor(
             }
 
             val message = Message()
-            message.what = PDFHandler.MESSAGE_CREATE_SCALED_BITMAP
+            message.what =
+                PDFHandler.MESSAGE_CREATE_SCALED_BITMAP
             message.data.putInt("index", currentPageIndex)
             message.data.putParcelableArrayList("list", tempScalingPages)
             pdfView.mPDFHandler.sendMessage(message)
@@ -991,12 +1025,18 @@ class PDFView @JvmOverloads constructor(
                     pdfTotalHeight += pdfView.mDividerHeight
                 val rect = RectF(left, pdfTotalHeight, right, pdfTotalHeight + scaledHeight)
                 pdfTotalHeight = rect.bottom
-                tempPagePlaceHolders.add(PageRect(fillWidthScale, rect))
+                tempPagePlaceHolders.add(
+                    PageRect(
+                        fillWidthScale,
+                        rect
+                    )
+                )
                 page.close()
             }
 
             val message = Message()
-            message.what = PDFHandler.MESSAGE_INIT_PDF_PLACE_HOLDER
+            message.what =
+                PDFHandler.MESSAGE_INIT_PDF_PLACE_HOLDER
             message.data.putParcelableArrayList("list", tempPagePlaceHolders)
             pdfView.mPDFHandler.sendMessage(message)
         }
@@ -1036,7 +1076,8 @@ class PDFView @JvmOverloads constructor(
                 fos.close()
 
                 val message = Message()
-                message.what = PDFHandler.MESSAGE_PDF_DOWNLOAD_SUCCESS
+                message.what =
+                    PDFHandler.MESSAGE_PDF_DOWNLOAD_SUCCESS
                 message.obj = filePath
                 pdfView.mPDFHandler.sendMessage(message)
             } catch (e: Exception) {

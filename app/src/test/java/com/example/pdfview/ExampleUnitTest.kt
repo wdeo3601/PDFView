@@ -1,4 +1,4 @@
-package com.example.testdemo
+package com.example.pdfview
 
 import org.junit.Test
 

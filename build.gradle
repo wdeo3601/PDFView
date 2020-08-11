@@ -5,7 +5,6 @@ buildscript {
     repositories {
         google()
         jcenter()
-        
     }
     dependencies {
         classpath 'com.android.tools.build:gradle:3.6.3'
@@ -13,6 +12,7 @@ buildscript {
 
         // NOTE: Do not place your application dependencies here; they belong
         // in the individual module build.gradle files
+        classpath "com.novoda:bintray-release:0.9.2"
     }
 }
 
@@ -20,10 +20,13 @@ allprojects {
     repositories {
         google()
         jcenter()
-        
     }
 }
 
 task clean(type: Delete) {
     delete rootProject.buildDir
 }
+
+//如何你的类库采用kotlin语言， 请加上
+//非常重要 要不它不认识你的项目.kt文件名 其中jsbridge是你的library名
+tasks.getByPath(":pdfview:javadocRelease").enabled = false

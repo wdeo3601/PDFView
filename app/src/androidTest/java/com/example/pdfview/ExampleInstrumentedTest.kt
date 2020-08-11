@@ -1,4 +1,4 @@
-package com.example.testdemo
+package com.example.pdfview
 
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.ext.junit.runners.AndroidJUnit4
