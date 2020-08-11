@@ -18,7 +18,7 @@ class MainActivity : AppCompatActivity() {
         val filePath = filesDir.absolutePath + File.separator + "PHP 7从入门到精通.pdf"
 //        val filePath = filesDir.absolutePath + File.separator + "simple.pdf"
 //        pdfView.showPdfFromPath(filePath)
-        pdfView.showPdfFromUrl("https://github.com/wdeo3601/PDFView/sample.pdf")
+        pdfView.showPdfFromUrl("https://github.com/wdeo3601/PDFView/raw/master/sample.pdf")
         pdfView.setOnPageChangedListener(object : PDFView.OnPageChangedListener{
             @SuppressLint("SetTextI18n")
             override fun onPageChanged(currentPageIndex: Int, totalPageCount: Int) {
