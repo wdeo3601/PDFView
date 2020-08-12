@@ -252,7 +252,6 @@ class PDFView @JvmOverloads constructor(
             mInitPageFramesFuture = EXECUTOR_SERVICE.submit(
                 InitPdfFramesTask(this)
             )
-//        initPageFrames(mPdfRenderer)
     }
 
     override fun onDraw(canvas: Canvas) {
@@ -400,7 +399,6 @@ class PDFView @JvmOverloads constructor(
                         if (!isFling) {
                             //单指滑动结束，处理滑动结束（无飞速滑动的情况）
                             submitCreateLoadingPagesTask()
-                            submitCreateScalingPagesTask()
                         }
                         true
                     }
@@ -491,8 +489,6 @@ class PDFView @JvmOverloads constructor(
             MotionEvent.ACTION_UP -> {
                 debug("onZoomTouchEvent-ACTION_UP")
                 submitCreateLoadingPagesTask()
-                //只有缩放了，才去创建缩放的page的bitmap
-                submitCreateScalingPagesTask()
                 return true
             }
         }
@@ -582,7 +578,8 @@ class PDFView @JvmOverloads constructor(
      * 如果线程池里有未执行或正在执行的任务，取消那个任务
      */
     private fun submitCreateScalingPagesTask() {
-        if (mCanvasScale == 1f) return
+        //只有在滑动状态为空闲的时候，才去创建缩放的 pdf 页的 bitmap
+        if (mTouchState != TouchState.IDLE) return
 
         if (mCreateScalingPagesFuture?.isDone != true)
             mCreateScalingPagesFuture?.cancel(true)
@@ -701,6 +698,9 @@ class PDFView @JvmOverloads constructor(
                         pdfView.mLoadingPages.clear()
                         pdfView.mLoadingPages.addAll(tempLoadingPages)
                         pdfView.invalidate()
+
+                        //渲染模糊页面成功后，再开始渲染屏幕上显示的pdf块的高清 bitmap
+                        pdfView.submitCreateScalingPagesTask()
                     }
                 }
                 MESSAGE_CREATE_SCALED_BITMAP -> {
@@ -821,6 +821,10 @@ class PDFView @JvmOverloads constructor(
 
         override fun onAnimationUpdate(animation: ValueAnimator) {
             val pdfView = mWeakReference.get() ?: return
+
+            //飞速滑动时，不渲染缩放的 bitmap
+            pdfView.clearScalingPages()
+
             val percent = animation.animatedValue as Float
             pdfView.mCanvasTranslate.x = lastCanvasTranslate.x + distanceX * percent
             pdfView.mCanvasTranslate.y = lastCanvasTranslate.y + distanceY * percent
@@ -844,7 +848,6 @@ class PDFView @JvmOverloads constructor(
         private fun preLoadPdf() {
             val pdfView = mWeakReference.get() ?: return
             pdfView.submitCreateLoadingPagesTask()
-            pdfView.submitCreateScalingPagesTask()
         }
     }
 
@@ -1224,7 +1227,7 @@ class PDFView @JvmOverloads constructor(
         try {
             val edit = mLoadingPagesBitmapDiskCache.edit(key)
             val outputStream = edit.newOutputStream(0)
-            bitmap.compress(Bitmap.CompressFormat.WEBP, 100, outputStream)
+            bitmap.compress(Bitmap.CompressFormat.PNG, 100, outputStream)
             edit.commit()
         } catch (e: Exception) {
             e.printStackTrace()
