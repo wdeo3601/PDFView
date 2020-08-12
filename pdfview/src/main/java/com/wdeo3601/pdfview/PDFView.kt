@@ -81,9 +81,12 @@ class PDFView @JvmOverloads constructor(
     private var mPdfTotalHeight: Float = 0f
 
     //处理飞速滑动的手势识别器
-    private val mGestureDetector by lazy { GestureDetector(context,
-        OnPDFGestureListener(this)
-    ) }
+    private val mGestureDetector by lazy {
+        GestureDetector(
+            context,
+            OnPDFGestureListener(this)
+        )
+    }
 
     //处理pdf转换bitmap的handler
     private val mPDFHandler: PDFHandler
@@ -611,14 +614,14 @@ class PDFView @JvmOverloads constructor(
      * 获取x轴可平移的间距
      */
     private fun getCanTranslateXRange(): Range<Float> {
-        return Range(-(mCanvasScale * mPdfTotalWidth - width), 0f)
+        return Range(min(-(mCanvasScale * mPdfTotalWidth - width), 0f), 0f)
     }
 
     /**
      * 获取y轴可平移的间距
      */
     private fun getCanTranslateYRange(): Range<Float> {
-        return Range(-(mCanvasScale * mPdfTotalHeight - height), 0f)
+        return Range(min(-(mCanvasScale * mPdfTotalHeight - height), 0f), 0f)
     }
 
     /**
