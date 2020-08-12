@@ -27,7 +27,7 @@ class MainActivity : AppCompatActivity() {
         pdfView.setOnPageChangedListener(object : PDFView.OnPageChangedListener {
             @SuppressLint("SetTextI18n")
             override fun onPageChanged(currentPageIndex: Int, totalPageCount: Int) {
-                tvPageCount.text = "${currentPageIndex + 1}/$totalPageCount"
+                tvPageCount.text = "${currentPageIndex+1}/$totalPageCount"
             }
         })
     }
