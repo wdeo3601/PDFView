@@ -11,7 +11,7 @@
 
 ### dependency  
 ```
-implementation 'com.wdeo3601:pdf-view:1.0.1'
+implementation 'com.wdeo3601:pdf-view:1.0.2'
 ```
 
 ### 布局文件引入  
