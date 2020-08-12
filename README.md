@@ -19,7 +19,7 @@
 
 ### 依赖引入
 ```
-implementation 'com.wdeo3601:pdf-view:1.0.2'
+implementation 'com.wdeo3601:pdf-view:1.0.3'
 ```
 
 ### 写 xml
