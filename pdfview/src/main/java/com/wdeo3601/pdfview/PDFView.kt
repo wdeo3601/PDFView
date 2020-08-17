@@ -341,16 +341,17 @@ class PDFView @JvmOverloads constructor(
      */
     private fun drawLoadingWaterMarks(canvas: Canvas) {
         mWaterMark ?: return
+
+        val left = (mPdfTotalWidth - mWaterMarkDestRect.width()) / 2
         mLoadingPages.filter { page ->
             page.pageRect?.fillWidthRect != null
                     && page.bitmap != null
         }
             .forEach {
                 val fillWidthRect = it.pageRect!!.fillWidthRect
-                val left = (mPdfTotalWidth - mWaterMarkDestRect.width()) / 2
                 mWaterMarkDestRect.offsetTo(
                     left,
-                    fillWidthRect.top + fillWidthRect.height() / 2 - mWaterMarkDestRect.height() / 2
+                    fillWidthRect.centerY() - mWaterMarkDestRect.height() / 2
                 )
                 canvas.drawBitmap(mWaterMark!!, mWaterMarkSrcRect, mWaterMarkDestRect, mPDFPaint)
             }
