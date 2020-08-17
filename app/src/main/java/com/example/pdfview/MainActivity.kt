@@ -18,6 +18,8 @@ class MainActivity : AppCompatActivity() {
         val pdfView = findViewById<PDFView>(R.id.pdf_view)
         val tvPageCount = findViewById<TextView>(R.id.tv_page_count)
 
+        pdfView.setWatermark(R.drawable.ic_default_watermark)
+
         val filePath = filesDir.absolutePath + File.separator + "sample.pdf"
         copyAssetsToFiles(baseContext, "sample.pdf", filePath)
         pdfView.showPdfFromPath(filePath)
@@ -27,7 +29,7 @@ class MainActivity : AppCompatActivity() {
         pdfView.setOnPageChangedListener(object : PDFView.OnPageChangedListener {
             @SuppressLint("SetTextI18n")
             override fun onPageChanged(currentPageIndex: Int, totalPageCount: Int) {
-                tvPageCount.text = "${currentPageIndex+1}/$totalPageCount"
+                tvPageCount.text = "${currentPageIndex + 1}/$totalPageCount"
             }
         })
     }

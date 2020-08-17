@@ -15,6 +15,7 @@ import android.view.GestureDetector
 import android.view.MotionEvent
 import android.view.View
 import android.view.animation.DecelerateInterpolator
+import androidx.annotation.DrawableRes
 import com.jakewharton.disklrucache.DiskLruCache
 import java.io.ByteArrayOutputStream
 import java.io.File
@@ -133,6 +134,11 @@ class PDFView @JvmOverloads constructor(
     //滑动时的页面变动监听
     private var mOnPageChangedListener: OnPageChangedListener? = null
 
+    //水印相关
+    private var mWaterMark: Bitmap? = null
+    private val mWaterMarkSrcRect: Rect by lazy { Rect() }
+    private val mWaterMarkDestRect: RectF by lazy { RectF() }
+
     init {
         //主线程初始化Handler
         mPDFHandler = PDFHandler(this)
@@ -232,7 +238,28 @@ class PDFView @JvmOverloads constructor(
         this.mMaxScale = min(maxScale, 20f)
     }
 
+    /**
+     * 设置水印
+     */
+    fun setWatermark(@DrawableRes waterMark: Int) {
+        mWaterMark = BitmapFactory.decodeResource(resources, waterMark)
+        mWaterMarkSrcRect.set(0, 0, mWaterMark!!.width, mWaterMark!!.height)
+    }
+
     //endregion
+
+    private fun initWatermarkDestRect() {
+        mWaterMark ?: return
+        val destWidth = mPdfTotalWidth / 2f
+        val scale = destWidth / mWaterMarkSrcRect.width()
+        val destHeight = mWaterMarkSrcRect.height() * scale
+        mWaterMarkDestRect.set(
+            0f,
+            0f,
+            destWidth,
+            destHeight
+        )
+    }
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         val widthSpecMode = MeasureSpec.getMode(widthMeasureSpec)
@@ -259,23 +286,34 @@ class PDFView @JvmOverloads constructor(
         //数据还没准备好，直接返回
         if (mPagePlaceHolders.isEmpty()) return
 
+        //保存画布初始状态
         canvas.save()
-
         //平移缩放
-        canvas.translate(mCanvasTranslate.x, mCanvasTranslate.y)
-        canvas.scale(mCanvasScale, mCanvasScale)
-
+        preDraw(canvas)
         //画占位图和分隔线
         drawPlaceHolderAndDivider(canvas)
-
         //画将要显示的完整page
         drawLoadingPages(canvas)
-
         //画边界分隔线
         drawEdgeDivider(canvas)
 
+        //恢复画布到初始状态（清除平移缩放）
+        canvas.restore()
         //如果缩放了，画将要显示的缩放后的page部分区域
         drawScalingPages(canvas)
+
+        //平移缩放
+        preDraw(canvas)
+        //画将要显示的完整page的水印
+        drawLoadingWaterMarks(canvas)
+    }
+
+    /**
+     * 处理画布的平移缩放
+     */
+    private fun preDraw(canvas: Canvas) {
+        canvas.translate(mCanvasTranslate.x, mCanvasTranslate.y)
+        canvas.scale(mCanvasScale, mCanvasScale)
     }
 
     /**
@@ -296,6 +334,26 @@ class PDFView @JvmOverloads constructor(
                     mDividerPaint
                 )
         }
+    }
+
+    /**
+     * 画完整显示的pdf页面的水印
+     */
+    private fun drawLoadingWaterMarks(canvas: Canvas) {
+        mWaterMark ?: return
+        mLoadingPages.filter { page ->
+            page.pageRect?.fillWidthRect != null
+                    && page.bitmap != null
+        }
+            .forEach {
+                val fillWidthRect = it.pageRect!!.fillWidthRect
+                val left = (mPdfTotalWidth - mWaterMarkDestRect.width()) / 2
+                mWaterMarkDestRect.offsetTo(
+                    left,
+                    fillWidthRect.top + fillWidthRect.height() / 2 - mWaterMarkDestRect.height() / 2
+                )
+                canvas.drawBitmap(mWaterMark!!, mWaterMarkSrcRect, mWaterMarkDestRect, mPDFPaint)
+            }
     }
 
     /**
@@ -324,7 +382,6 @@ class PDFView @JvmOverloads constructor(
      * 画缩放过得pdf页面部分区域
      */
     private fun drawScalingPages(canvas: Canvas) {
-        canvas.restore()
         mScalingPages.filter {
             it.pageRect?.fillWidthRect != null && it.bitmap != null
         }
@@ -685,6 +742,8 @@ class PDFView @JvmOverloads constructor(
                             pdfView.mCurrentPageIndex,
                             tempPagePlaceHolders.size
                         )
+                        //初始化水印的目标绘制宽高
+                        pdfView.initWatermarkDestRect()
                     }
                 }
                 MESSAGE_CREATE_LOADING_PDF_BITMAP -> {
@@ -717,6 +776,7 @@ class PDFView @JvmOverloads constructor(
                 }
             }
         }
+
     }
 
     /**
