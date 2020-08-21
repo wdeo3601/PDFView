@@ -11,7 +11,7 @@
 **使用系统自带的 `PdfRenderer` 来处理的 pdf 原始文件渲染，`最低支持安卓5.0`**
 
 ## 效果图  
-![示例](https://s1.ax1x.com/2020/08/21/dNCWvD.gif)
+![dNCWvD.gif](https://s1.ax1x.com/2020/08/21/dNCWvD.gif)
 
 ## 使用
 
