@@ -11,7 +11,9 @@
 **使用系统自带的 `PdfRenderer` 来处理的 pdf 原始文件渲染，`最低支持安卓5.0`**
 
 ## 效果图  
-![dNCWvD.gif](https://s1.ax1x.com/2020/08/21/dNCWvD.gif)
+![正常滑动](https://github.com/wdeo3601/PDFView/blob/master/sample_1.gif)
+![放大后滑动](https://github.com/wdeo3601/PDFView/blob/master/sample_2.gif)
+![放大后平移](https://github.com/wdeo3601/PDFView/blob/master/sample_3.gif)
 
 ## 使用
 
