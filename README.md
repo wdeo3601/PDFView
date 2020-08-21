@@ -1,19 +1,17 @@
 # PDFView
-一个安卓平台的 pdf 查看器，支持滑动、缩放、三级缓存、放大展示高清图、支持一些功能配置。
+一个安卓平台的 PDF 查看器，支持滑动、缩放、三级缓存、放大展示高清图、支持一些功能配置。
 * 支持滑动、缩放、缩放后的滑动、缩放后的平移
 * 支持放大后查看高清 PDF 页
 * 支持设置预加载 PDF 页的个数，有效避免 OOM
-* 使用线程池 + Handler ，异步处理 PDF 转换 BitMap 的相关操作
-* 使用 LruCache、DiskLruCache 缓存转换过的 PDF 页的 BitMap
+* 使用线程池 + Handler ，异步处理 PDF 转换 Bitmap 的相关操作
+* 使用 LruCache、DiskLruCache 缓存转换过的 PDF 页的 Bitmap
 * 支持从本地打开 PDF 文件、打开网络 PDF 文件
 * 支持为文档添加水印
 
 **使用系统自带的 `PdfRenderer` 来处理的 pdf 原始文件渲染，`最低支持安卓5.0`**
 
 ## 效果图  
-![正常滑动](https://github.com/wdeo3601/PDFView/blob/master/sample_1.gif)
-![放大后滑动](https://github.com/wdeo3601/PDFView/blob/master/sample_2.gif)
-![放大后平移](https://github.com/wdeo3601/PDFView/blob/master/sample_3.gif)
+![示例](https://s1.ax1x.com/2020/08/21/dNCWvD.gif)
 
 ## 使用
 
