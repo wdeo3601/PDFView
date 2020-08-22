@@ -11,9 +11,9 @@
 **使用系统自带的 `PdfRenderer` 来处理的 pdf 原始文件渲染，`最低支持安卓5.0`**
 
 ## 效果图  
-![正常滑动](https://github.com/wdeo3601/PDFView/blob/master/sample_1.gif)
-![放大后滑动](https://github.com/wdeo3601/PDFView/blob/master/sample_2.gif)
-![放大后平移](https://github.com/wdeo3601/PDFView/blob/master/sample_3.gif)
+![正常滑动](https://img-blog.csdnimg.cn/20200822153707459.gif)
+![放大后滑动](https://img-blog.csdnimg.cn/20200822153648757.gif)
+![放大后平移](https://img-blog.csdnimg.cn/20200822153623644.gif)
 
 ## 使用
 
@@ -64,4 +64,4 @@ pdfView.showPdfFromPath(filePath)
 
 ### 查看更多
 
-[7天1000行代码从零开发一个 Android PDF 查看器]()
+[7天1000行代码从零开发一个 Android PDF 查看器](https://blog.csdn.net/Captive_Rainbow_/article/details/108169413)
