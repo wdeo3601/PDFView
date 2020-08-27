@@ -33,14 +33,13 @@ class MainActivity : AppCompatActivity() {
 
         findViewById<Button>(R.id.bt_choose_pdf).setOnClickListener {
             val checkSelfPermission = checkSelfPermission(Manifest.permission.READ_EXTERNAL_STORAGE)
-            when {
-                checkSelfPermission == PackageManager.PERMISSION_GRANTED -> choosePdfFromLocal()
-                shouldShowRequestPermissionRationale(Manifest.permission.READ_EXTERNAL_STORAGE) -> requestPermissions(
+            if (checkSelfPermission == PackageManager.PERMISSION_GRANTED)
+                choosePdfFromLocal()
+            else
+                requestPermissions(
                     arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE),
                     PERMISSION_REQUEST_CODE
                 )
-                else -> Toast.makeText(this, "从设置里为该app打开权限", Toast.LENGTH_SHORT).show()
-            }
         }
     }
 
@@ -102,15 +101,17 @@ class MainActivity : AppCompatActivity() {
 
     }
 
+    @RequiresApi(Build.VERSION_CODES.M)
     override fun onRequestPermissionsResult(
         requestCode: Int,
         permissions: Array<out String>,
         grantResults: IntArray
     ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (requestCode == PERMISSION_REQUEST_CODE
-            && grantResults[0] == PackageManager.PERMISSION_GRANTED
-        )
+        if (requestCode != PERMISSION_REQUEST_CODE) return
+        if (grantResults[0] == PackageManager.PERMISSION_GRANTED)
             choosePdfFromLocal()
+        else if (!shouldShowRequestPermissionRationale(Manifest.permission.READ_EXTERNAL_STORAGE))
+            Toast.makeText(this, "从设置里为该app打开权限", Toast.LENGTH_SHORT).show()
     }
 }
