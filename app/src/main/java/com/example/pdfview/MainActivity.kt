@@ -1,37 +1,53 @@
 package com.example.pdfview
 
-import android.annotation.SuppressLint
+import android.Manifest
+import android.app.Activity
 import android.content.Context
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
-import android.widget.TextView
+import android.widget.Button
+import android.widget.Toast
+import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
-import com.wdeo3601.pdfview.PDFView
 import java.io.File
 import java.io.FileOutputStream
 import java.io.InputStream
 
 class MainActivity : AppCompatActivity() {
 
+    companion object {
+        private const val CHOOSE_PDF_REQUEST_CODE = 100
+        private const val PERMISSION_REQUEST_CODE = 101
+    }
+
+    @RequiresApi(Build.VERSION_CODES.M)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
-        val pdfView = findViewById<PDFView>(R.id.pdf_view)
-        val tvPageCount = findViewById<TextView>(R.id.tv_page_count)
 
-        pdfView.setWatermark(R.drawable.ic_default_watermark)
+        findViewById<Button>(R.id.bt_sample).setOnClickListener {
+            openSamplePdf()
+        }
 
+        findViewById<Button>(R.id.bt_choose_pdf).setOnClickListener {
+            val checkSelfPermission = checkSelfPermission(Manifest.permission.READ_EXTERNAL_STORAGE)
+            when {
+                checkSelfPermission == PackageManager.PERMISSION_GRANTED -> choosePdfFromLocal()
+                shouldShowRequestPermissionRationale(Manifest.permission.READ_EXTERNAL_STORAGE) -> requestPermissions(
+                    arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE),
+                    PERMISSION_REQUEST_CODE
+                )
+                else -> Toast.makeText(this, "从设置里为该app打开权限", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    private fun openSamplePdf() {
         val filePath = filesDir.absolutePath + File.separator + "sample.pdf"
         copyAssetsToFiles(baseContext, "sample.pdf", filePath)
-        pdfView.showPdfFromPath(filePath)
-
-//        pdfView.showPdfFromUrl("https://github.com/wdeo3601/PDFView/raw/master/sample.pdf")
-
-        pdfView.setOnPageChangedListener(object : PDFView.OnPageChangedListener {
-            @SuppressLint("SetTextI18n")
-            override fun onPageChanged(currentPageIndex: Int, totalPageCount: Int) {
-                tvPageCount.text = "${currentPageIndex + 1}/$totalPageCount"
-            }
-        })
+        PdfDetailActivity.startMeWithFilePath(this, filePath)
     }
 
     /**
@@ -61,5 +77,40 @@ class MainActivity : AppCompatActivity() {
         } catch (e: Exception) {
             e.printStackTrace()
         }
+    }
+
+    private fun choosePdfFromLocal() {
+        val intent = Intent()
+        intent.action = Intent.ACTION_OPEN_DOCUMENT
+        intent.type = "*/*"
+        val mimeTypes = arrayOf("application/pdf")
+        intent.putExtra(Intent.EXTRA_MIME_TYPES, mimeTypes)
+        intent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, false)
+        startActivityForResult(Intent.createChooser(intent, "choose file"), CHOOSE_PDF_REQUEST_CODE)
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode != CHOOSE_PDF_REQUEST_CODE) return
+        if (resultCode != Activity.RESULT_OK) return
+        data ?: return
+        val uri = data.data ?: return
+        PdfDetailActivity.startMeWithFilePath(
+            this,
+            FileUtils.getFilePathByUri(this, uri) ?: return
+        )
+
+    }
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == PERMISSION_REQUEST_CODE
+            && grantResults[0] == PackageManager.PERMISSION_GRANTED
+        )
+            choosePdfFromLocal()
     }
 }

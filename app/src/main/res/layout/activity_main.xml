@@ -1,20 +1,25 @@
 <?xml version="1.0" encoding="utf-8"?>
-<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:orientation="vertical"
     tools:context=".MainActivity">
 
-    <com.wdeo3601.pdfview.PDFView
-        android:id="@+id/pdf_view"
+    <Button
+        android:id="@+id/bt_sample"
         android:layout_width="match_parent"
-        android:layout_height="match_parent" />
-
-    <TextView
-        android:id="@+id/tv_page_count"
-        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:padding="16dp"
-        android:background="@android:drawable/btn_default"/>
+        android:layout_margin="16dp"
+        android:gravity="center"
+        android:text="打开示例 pdf" />
 
-</FrameLayout>
+    <Button
+        android:id="@+id/bt_choose_pdf"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_margin="16dp"
+        android:gravity="center"
+        android:text="选择本地 pdf" />
+
+</LinearLayout>
